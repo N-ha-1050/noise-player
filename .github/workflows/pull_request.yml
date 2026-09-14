@@ -1,0 +1,40 @@
+name: Code quality
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  biome:
+    name: Biome Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Setup Biome
+        uses: biomejs/setup-biome@v2
+      - name: Run Biome
+        run: biome ci .
+
+  typecheck:
+    name: Type Check & Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/setup@v2
+        with:
+          cache: true
+      - name: Type check
+        run: pnpm typecheck
+      - name: Build
+        run: pnpm build
