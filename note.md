@@ -238,3 +238,11 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
 ```
+
+### フォントの導入
+
+<https://fontsource.org/>
+
+```powershell
+pnpm add @fontsource-variable/noto-sans @fontsource-variable/noto-sans-jp @fontsource-variable/noto-emoji @fontsource-variable/material-symbols-outlined
+```

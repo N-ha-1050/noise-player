@@ -1,0 +1,36 @@
+:root {
+  --primary-color: #99e142;
+  --background-color: #ffffff;
+  --neutral-color: #1a365d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary-color: #99e142;
+    --background-color: #1a365d;
+    --neutral-color: #ffffff;
+  }
+}
+
+body {
+  font-family:
+    "Noto Sans Variable", "Noto Sans JP Variable", "Noto Emoji Variable",
+    ui-sans-serif, sans-serif;
+  color: var(--neutral-color);
+  background-color: var(--background-color);
+}
+
+.material-symbols-outlined {
+  /* biome-ignore lint/a11y/useGenericFontNames: アイコンフォントなので固有のフォントファミリー名のみを指定 */
+  font-family: "Material Symbols Outlined Variable";
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px; /* Preferred icon size */
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+}

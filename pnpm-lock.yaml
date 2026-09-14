@@ -165,6 +165,19 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@fontsource-variable/material-symbols-outlined':
+        specifier: ^5.3.6
+        version: 5.3.6
+      '@fontsource-variable/noto-emoji':
+        specifier: ^5.3.1
+        version: 5.3.1
+      '@fontsource-variable/noto-sans':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource-variable/noto-sans-jp':
+        specifier: ^5.3.0
+        version: 5.3.0
     devDependencies:
       '@biomejs/biome':
         specifier: 2.5.13
@@ -237,6 +250,18 @@ packages:
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource-variable/material-symbols-outlined@5.3.6':
+    resolution: {integrity: sha512-XM9x1ZBt1DFoxObS1IYY2JVXaA+848kECx2j53RZowY0/vWqYTapYMuEIZWXa7CyVpEs07lgY9nZriuQvDGNVQ==}
+
+  '@fontsource-variable/noto-emoji@5.3.1':
+    resolution: {integrity: sha512-PWGUJWgpBTWbYfp5q7ejeX6bqC2usU3p1OQ1pMBfmjlRsC4zfkWwE8fXOO/mHWOXFVIwYKKAb+X5xUGMcEQJ8g==}
+
+  '@fontsource-variable/noto-sans-jp@5.3.0':
+    resolution: {integrity: sha512-XVL9GfGBRjj523v9w3Bctu4mNq7E5rUa+AMZm8DK1EM3LAGlKC3DZMvuqkLn4DB4TwwoAjcsJUCiRpUTDzzOkw==}
+
+  '@fontsource-variable/noto-sans@5.3.0':
+    resolution: {integrity: sha512-e3ZuxzY9AL2psXPZlhwhnYrHUHv6PMoyK9MQ7croF0CUgURLqu9EMjW7q2FgVLwij1tjLsIHQrnwQ8aUcg4BiA==}
 
   '@oxc-project/types@0.149.0':
     resolution: {integrity: sha512-Efcc+iF0j3Bf67YjEqIqWXbX5XddXoK/Mw4K1/JuXwRCZ8N16VR7iT23nlCc9XrveFVh/E5Rqs2StT0V8v9LdA==}
@@ -599,6 +624,14 @@ snapshots:
 
   '@biomejs/cli-win32-x64@2.5.13':
     optional: true
+
+  '@fontsource-variable/material-symbols-outlined@5.3.6': {}
+
+  '@fontsource-variable/noto-emoji@5.3.1': {}
+
+  '@fontsource-variable/noto-sans-jp@5.3.0': {}
+
+  '@fontsource-variable/noto-sans@5.3.0': {}
 
   '@oxc-project/types@0.149.0': {}
 
