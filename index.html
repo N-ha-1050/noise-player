@@ -6,7 +6,31 @@
     <title>Noise Player</title>
   </head>
   <body>
-    <h1>Noise Player</h1>
+    <header id="title">
+      <h1>Noise Player</h1>
+    </header>
+    <main id="main">
+      <button id="play-button" type="button" aria-pressed="false">
+        <span
+          id="play-button-icon"
+          class="material-symbols-outlined"
+          aria-hidden="true"
+          >play_arrow</span
+        >
+        <span id="play-button-label">Play</span>
+      </button>
+      <div id="volume-control">
+        <label for="volume-input">Volume</label>
+        <input
+          type="range"
+          id="volume-input"
+          min="0"
+          max="2"
+          step="0.01"
+          value="0.1"
+        >
+      </div>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
