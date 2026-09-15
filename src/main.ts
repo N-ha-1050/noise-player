@@ -5,28 +5,18 @@ import "@fontsource-variable/material-symbols-outlined/wght.css"
 
 import "./style.css"
 
-function createWhiteNoiseBuffer(context: AudioContext, duration: number) {
-  const bufferSize = context.sampleRate * duration
-  const buffer = context.createBuffer(1, bufferSize, context.sampleRate)
-  const data = buffer.getChannelData(0)
-
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = Math.random() * 2 - 1 // -1.0 to 1.0
-  }
-
-  return buffer
-}
+import { startNoise, stopNoise } from "./audio/audioEngine"
+import { validNoiseType } from "./audio/noiseCreators"
 
 type State =
   | {
       isPlaying: true
-      whiteNoiseSource: AudioBufferSourceNode
+      noiseSource: AudioBufferSourceNode
     }
   | {
       isPlaying: false
-      whiteNoiseSource: null
+      noiseSource: null
     }
-
 function render(state: State) {
   const playButton = document.getElementById("play-button") as HTMLButtonElement
   const playButtonIcon = document.getElementById(
@@ -46,9 +36,11 @@ function main() {
   const volumeInput = document.getElementById(
     "volume-input",
   ) as HTMLInputElement
+  const noiseSelect = document.getElementById(
+    "noise-select",
+  ) as HTMLSelectElement
 
   const context = new AudioContext()
-  const buffer = createWhiteNoiseBuffer(context, 1)
 
   const gainNode = context.createGain()
   gainNode.gain.value = parseFloat(volumeInput.value)
@@ -56,50 +48,63 @@ function main() {
 
   let state: State = {
     isPlaying: false,
-    whiteNoiseSource: null,
+    noiseSource: null,
   }
 
-  playButton.addEventListener("click", () => {
-    if (context.state === "suspended") context.resume()
+  function handleEnded(ev: Event) {
+    if (state.isPlaying && state.noiseSource === ev.target) {
+      state = {
+        isPlaying: false,
+        noiseSource: null,
+      }
+      render(state)
+    }
+  }
+
+  playButton.addEventListener("click", async () => {
+    if (context.state === "suspended") await context.resume()
 
     if (state.isPlaying) {
       // 停止
-      state.whiteNoiseSource.stop()
-      state.whiteNoiseSource.disconnect()
+      stopNoise(state.noiseSource)
       state = {
         isPlaying: false,
-        whiteNoiseSource: null,
+        noiseSource: null,
       }
+      render(state)
     } else {
       // 再生
-
-      const source = context.createBufferSource()
-      source.buffer = buffer
-      source.loop = true
-
-      source.connect(gainNode)
-      source.addEventListener("ended", () => {
-        if (state.isPlaying && state.whiteNoiseSource === source) {
-          state = {
-            isPlaying: false,
-            whiteNoiseSource: null,
-          }
-          render(state)
-        }
-      })
-      source.start()
+      const noiseType = validNoiseType(noiseSelect.value)
+        ? noiseSelect.value
+        : "white"
+      const source = startNoise(context, gainNode, noiseType, handleEnded)
 
       state = {
         isPlaying: true,
-        whiteNoiseSource: source,
+        noiseSource: source,
       }
+      render(state)
     }
-
-    render(state)
   })
 
   volumeInput.addEventListener("input", () => {
     gainNode.gain.value = parseFloat(volumeInput.value)
+  })
+
+  noiseSelect.addEventListener("change", async () => {
+    if (!state.isPlaying) return
+
+    stopNoise(state.noiseSource)
+    const noiseType = validNoiseType(noiseSelect.value)
+      ? noiseSelect.value
+      : "white"
+    if (context.state === "suspended") await context.resume()
+    const source = startNoise(context, gainNode, noiseType, handleEnded)
+    state = {
+      isPlaying: true,
+      noiseSource: source,
+    }
+    render(state)
   })
 
   render(state)

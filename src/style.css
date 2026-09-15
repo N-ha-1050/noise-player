@@ -46,6 +46,12 @@ body {
   gap: 16px;
 }
 
+#noise-select-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 #play-button {
   display: inline-flex;
   align-items: center;
