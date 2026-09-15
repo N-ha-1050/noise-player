@@ -246,3 +246,12 @@ jobs:
 ```powershell
 pnpm add @fontsource-variable/noto-sans @fontsource-variable/noto-sans-jp @fontsource-variable/noto-emoji @fontsource-variable/material-symbols-outlined
 ```
+
+### Vite PWA プラグインの導入
+
+<https://vite-pwa-org.netlify.app/guide/>
+
+```powershell
+pnpm add -D vite-plugin-pwa
+pnpm add -D @vite-pwa/assets-generator
+```

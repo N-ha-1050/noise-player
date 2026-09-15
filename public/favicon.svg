@@ -1,13 +1,11 @@
 <svg
   version="1.1"
   baseProfile="full"
-  width="256"
-  height="256"
+  width="256" height="256"
   xmlns="http://www.w3.org/2000/svg"
-  role="img"
   aria-label="Noise Player Logo"
 >
-  <circle cx="128" cy="128" r="128" fill="#99E142" />
+  <rect width="256" height="256" rx="32" ry="32" fill="#99E142" />
   <path
     d="
       M 64 192
