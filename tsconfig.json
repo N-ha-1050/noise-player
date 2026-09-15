@@ -6,7 +6,8 @@
     "types": [
       "vite/client",
       "vite-plugin-pwa/client",
-      "vite-plugin-pwa/pwa-assets"
+      "vite-plugin-pwa/pwa-assets",
+      "node"
     ],
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,

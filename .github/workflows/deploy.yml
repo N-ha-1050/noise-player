@@ -34,6 +34,15 @@ jobs:
         uses: pnpm/setup@v2
         with:
           cache: true
+
+      # === Playwright の Chromium ブラウザをインストール ===
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # === 撮影スクリプトの実行（public/screenshots に画像が保存される） ===
+      - name: Generate Screenshots
+        run: pnpm generate:screenshots
+
       - name: Build
         run: pnpm build
       - name: Setup Pages

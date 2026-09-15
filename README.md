@@ -40,6 +40,14 @@ author: N_ha
 pnpm install
 ```
 
+### Playwright のブラウザインストール
+
+PWA 用のスクリーンショット自動撮影を行うために、Playwright のブラウザ（Chromium）をインストールします。
+
+```bash
+pnpm exec playwright install
+```
+
 ### Git Hooks の有効化
 
 コミット時・プッシュ時の自動フォーマットおよび型チェックを有効化します。
@@ -59,6 +67,7 @@ pnpm lefthook install
 | `pnpm preview` | ビルド成果物をローカルでプレビューします |
 | `pnpm typecheck` | TypeScript の型チェックを実行します (`tsc --noEmit`) |
 | `pnpm check` | 型チェックと Biome によるコード検証をまとめて実行します |
+| `pnpm generate:screenshots` | PWA 用のスクリーンショット（desktop / mobile）を自動撮影して `public/screenshots` に保存します |
 
 ---
 

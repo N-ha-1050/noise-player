@@ -20,6 +20,22 @@ export default {
         theme_color: "#99E142",
         background_color: "#99E142",
         lang: "ja",
+        screenshots: [
+          {
+            src: "screenshots/desktop.png",
+            sizes: "1280x720",
+            type: "image/png",
+            form_factor: "wide",
+            label: "Desktop View",
+          },
+          {
+            src: "screenshots/mobile.png",
+            sizes: "390x844",
+            type: "image/png",
+            form_factor: "narrow",
+            label: "Mobile View",
+          },
+        ],
       },
     }),
   ],
