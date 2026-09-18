@@ -1,5 +1,5 @@
 import { type NoiseType, noiseBufferCreators } from "./noiseCreators"
-import noiseProcessorUrl from "./noiseWorker?url"
+import noiseProcessorUrl from "./noiseWorker?worker&url"
 
 export async function ensureAudioInitialized(
   context: AudioContext | null,
