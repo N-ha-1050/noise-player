@@ -5,18 +5,23 @@ import "@fontsource-variable/material-symbols-outlined/wght.css"
 
 import "./style.css"
 
-import { startNoise, stopNoise } from "./audio/audioEngine"
+import { ensureAudioInitialized, setNoiseType } from "./audio/audioEngine"
 import { validNoiseType } from "./audio/noiseCreators"
 
 type State =
   | {
-      isPlaying: true
-      noiseSource: AudioBufferSourceNode
+      isPlaying: false
+      context: null
+      gainNode: null
+      noiseNode: null
     }
   | {
-      isPlaying: false
-      noiseSource: null
+      isPlaying: boolean
+      context: AudioContext
+      gainNode: GainNode
+      noiseNode: AudioWorkletNode
     }
+
 function render(state: State) {
   const playButton = document.getElementById("play-button") as HTMLButtonElement
   const playButtonIcon = document.getElementById(
@@ -31,7 +36,7 @@ function render(state: State) {
   playButtonLabel.textContent = state.isPlaying ? "Stop" : "Play"
 }
 
-function main() {
+async function main() {
   const playButton = document.getElementById("play-button") as HTMLButtonElement
   const volumeInput = document.getElementById(
     "volume-input",
@@ -40,71 +45,77 @@ function main() {
     "noise-select",
   ) as HTMLSelectElement
 
-  const context = new AudioContext()
-
-  const gainNode = context.createGain()
-  gainNode.gain.value = parseFloat(volumeInput.value)
-  gainNode.connect(context.destination)
-
   let state: State = {
     isPlaying: false,
-    noiseSource: null,
+    context: null,
+    gainNode: null,
+    noiseNode: null,
   }
 
-  function handleEnded(ev: Event) {
-    if (state.isPlaying && state.noiseSource === ev.target) {
-      state = {
-        isPlaying: false,
-        noiseSource: null,
-      }
-      render(state)
-    }
-  }
-
+  // 再生 / 停止ボタン
   playButton.addEventListener("click", async () => {
-    if (context.state === "suspended") await context.resume()
+    const {
+      context: stateContext,
+      gainNode: stateGainNode,
+      noiseNode: stateNoiseNode,
+      isPlaying,
+    } = state
 
-    if (state.isPlaying) {
-      // 停止
-      stopNoise(state.noiseSource)
-      state = {
-        isPlaying: false,
-        noiseSource: null,
-      }
+    const { context, gainNode, noiseNode } = await ensureAudioInitialized(
+      stateContext,
+      stateGainNode,
+      stateNoiseNode,
+    )
+
+    if (isPlaying) {
+      // 停止: ポップノイズ防止のため 0.05秒かけて音量を 0 にフェードアウト
+      gainNode.gain.setTargetAtTime(0, context.currentTime, 0.05)
+
+      // フェードアウト完了後（約60ms後）に AudioContext を完全休止
+      setTimeout(async () => {
+        if (!state.isPlaying && context.state === "running") {
+          await context.suspend()
+        }
+      }, 60)
+
+      state = { isPlaying: false, context, gainNode, noiseNode }
       render(state)
     } else {
-      // 再生
+      if (context.state === "suspended") await context.resume()
+
+      // 再生: 現在選択中のノイズを設定し、スライダーの音量へフェードイン
       const noiseType = validNoiseType(noiseSelect.value)
         ? noiseSelect.value
         : "white"
-      const source = startNoise(context, gainNode, noiseType, handleEnded)
+      setNoiseType(noiseType, noiseNode)
 
-      state = {
-        isPlaying: true,
-        noiseSource: source,
-      }
+      const targetVolume = parseFloat(volumeInput.value)
+      gainNode.gain.setTargetAtTime(targetVolume, context.currentTime, 0.05)
+
+      state = { isPlaying: true, context, gainNode, noiseNode }
       render(state)
     }
   })
 
+  // 音量スライダー
   volumeInput.addEventListener("input", () => {
-    gainNode.gain.value = parseFloat(volumeInput.value)
+    const { context, gainNode, isPlaying } = state
+
+    if (!gainNode || !context || !isPlaying) return
+    const targetVolume = parseFloat(volumeInput.value)
+    // スライダー操作時も滑らかに追従
+    gainNode.gain.setTargetAtTime(targetVolume, context.currentTime, 0.01)
   })
 
-  noiseSelect.addEventListener("change", async () => {
-    if (!state.isPlaying) return
-
-    stopNoise(state.noiseSource)
+  // ノイズ種類セレクトボックス
+  noiseSelect.addEventListener("change", () => {
+    const { noiseNode } = state
+    if (!noiseNode) return
     const noiseType = validNoiseType(noiseSelect.value)
       ? noiseSelect.value
       : "white"
-    if (context.state === "suspended") await context.resume()
-    const source = startNoise(context, gainNode, noiseType, handleEnded)
-    state = {
-      isPlaying: true,
-      noiseSource: source,
-    }
-    render(state)
+    // 再生中でも停止中でも、Worklet にメッセージを送るだけで即座に切り替わる
+    setNoiseType(noiseType, noiseNode)
   })
 
   render(state)
