@@ -6,7 +6,11 @@ import "@fontsource-variable/material-symbols-outlined/wght.css"
 import "./style.css"
 
 import { ensureAudioInitialized, setNoiseType } from "./audio/audioEngine"
-import { validNoiseType } from "./audio/noiseCreators"
+import {
+  type NoiseType,
+  noiseTypes,
+  validNoiseType,
+} from "./audio/noiseCreators"
 import {
   setupMediaSessionHandlers,
   updateMediaSession,
@@ -42,13 +46,20 @@ function render(state: State) {
   playButtonLabel.textContent = state.isPlaying ? "Pause" : "Play"
 }
 
+function getCurrentNoiseType() {
+  const noiseSelect = document.getElementById(
+    "noise-select",
+  ) as HTMLSelectElement
+  const noiseType = validNoiseType(noiseSelect.value)
+    ? noiseSelect.value
+    : "white"
+  return noiseType
+}
+
 async function startPlayback(state: State) {
   const volumeInput = document.getElementById(
     "volume-input",
   ) as HTMLInputElement
-  const noiseSelect = document.getElementById(
-    "noise-select",
-  ) as HTMLSelectElement
   const {
     context: stateContext,
     gainNode: stateGainNode,
@@ -65,9 +76,7 @@ async function startPlayback(state: State) {
   if (context.state === "suspended") await context.resume()
 
   // 再生: 現在選択中のノイズを設定し、スライダーの音量へフェードイン
-  const noiseType = validNoiseType(noiseSelect.value)
-    ? noiseSelect.value
-    : "white"
+  const noiseType = getCurrentNoiseType()
   setNoiseType(noiseType, noiseNode)
 
   const targetVolume = parseFloat(volumeInput.value)
@@ -83,10 +92,6 @@ async function startPlayback(state: State) {
 function stopPlayback(state: State) {
   if (!state.isPlaying) return state
 
-  const noiseSelect = document.getElementById(
-    "noise-select",
-  ) as HTMLSelectElement
-
   const { context, gainNode, noiseNode } = state
 
   // 停止: ポップノイズ防止のため 0.05秒かけて音量を 0 にフェードアウト
@@ -99,15 +104,53 @@ function stopPlayback(state: State) {
     }
   }, 60)
 
-  const noiseType = validNoiseType(noiseSelect.value)
-    ? noiseSelect.value
-    : "white"
+  const noiseType = getCurrentNoiseType()
   const silentAudio = updateMediaSession(false, noiseType, state.silentAudio)
 
   state = { isPlaying: false, context, gainNode, noiseNode, silentAudio }
   render(state)
   return state
 }
+
+function changeNoiseType(state: State, noiseType: NoiseType) {
+  const noiseSelect = document.getElementById(
+    "noise-select",
+  ) as HTMLSelectElement
+  noiseSelect.value = noiseType
+
+  const { noiseNode, isPlaying, silentAudio } = state
+
+  if (noiseNode) {
+    // 再生中でも停止中でも、Worklet にメッセージを送るだけで即座に切り替わる
+    setNoiseType(noiseType, noiseNode)
+  }
+
+  if (isPlaying) {
+    // 再生中であれば、ロック画面等のタイトル表示も即座に更新
+    updateMediaSession(true, noiseType, silentAudio)
+  }
+
+  return state
+}
+
+function getPreviousNoiseType(current: NoiseType) {
+  const currentIndex = noiseTypes.indexOf(current)
+  const previousIndex =
+    (currentIndex - 1 + noiseTypes.length) % noiseTypes.length
+  return noiseTypes[previousIndex]
+}
+
+function getNextNoiseType(current: NoiseType) {
+  const currentIndex = noiseTypes.indexOf(current)
+  const nextIndex = (currentIndex + 1) % noiseTypes.length
+  return noiseTypes[nextIndex]
+}
+
+const changeNoiseTypeToPrevious = (state: State, currentNoiseType: NoiseType) =>
+  changeNoiseType(state, getPreviousNoiseType(currentNoiseType))
+
+const changeNoiseTypeToNext = (state: State, currentNoiseType: NoiseType) =>
+  changeNoiseType(state, getNextNoiseType(currentNoiseType))
 
 async function main() {
   const playButton = document.getElementById("play-button") as HTMLButtonElement
@@ -117,6 +160,10 @@ async function main() {
   const noiseSelect = document.getElementById(
     "noise-select",
   ) as HTMLSelectElement
+  const previousButton = document.getElementById(
+    "previous-button",
+  ) as HTMLButtonElement
+  const nextButton = document.getElementById("next-button") as HTMLButtonElement
 
   let state: State = {
     isPlaying: false,
@@ -142,6 +189,26 @@ async function main() {
     onPause: () => {
       state = stopPlayback(state)
     },
+    onNext: () => {
+      const currentNoiseType = getCurrentNoiseType()
+      state = changeNoiseTypeToNext(state, currentNoiseType)
+    },
+    onPrevious: () => {
+      const currentNoiseType = getCurrentNoiseType()
+      state = changeNoiseTypeToPrevious(state, currentNoiseType)
+    },
+  })
+
+  // 前のノイズボタン
+  previousButton.addEventListener("click", () => {
+    const currentNoiseType = getCurrentNoiseType()
+    state = changeNoiseTypeToPrevious(state, currentNoiseType)
+  })
+
+  // 次のノイズボタン
+  nextButton.addEventListener("click", () => {
+    const currentNoiseType = getCurrentNoiseType()
+    state = changeNoiseTypeToNext(state, currentNoiseType)
   })
 
   // 音量スライダー
@@ -156,21 +223,8 @@ async function main() {
 
   // ノイズ種類セレクトボックス
   noiseSelect.addEventListener("change", () => {
-    const { noiseNode, isPlaying, silentAudio } = state
-
-    const noiseType = validNoiseType(noiseSelect.value)
-      ? noiseSelect.value
-      : "white"
-
-    if (noiseNode) {
-      // 再生中でも停止中でも、Worklet にメッセージを送るだけで即座に切り替わる
-      setNoiseType(noiseType, noiseNode)
-    }
-
-    if (isPlaying) {
-      // 再生中であれば、ロック画面等のタイトル表示も即座に更新
-      updateMediaSession(true, noiseType, silentAudio)
-    }
+    const noiseType = getCurrentNoiseType()
+    state = changeNoiseType(state, noiseType)
   })
 
   render(state)

@@ -18,15 +18,34 @@
           <option value="brown">Brown Noise</option>
         </select>
       </div>
-      <button id="play-button" type="button" aria-pressed="false">
-        <span
-          id="play-button-icon"
-          class="material-symbols-outlined"
-          aria-hidden="true"
-          >play_arrow</span
+      <div>
+        <button id="previous-button" type="button" class="button-includes-icon">
+          <span class="material-symbols-outlined" aria-hidden="true"
+            >skip_previous</span
+          >
+          <span>Previous</span>
+        </button>
+        <button
+          id="play-button"
+          type="button"
+          aria-pressed="false"
+          class="button-includes-icon"
         >
-        <span id="play-button-label">Play</span>
-      </button>
+          <span
+            id="play-button-icon"
+            class="material-symbols-outlined"
+            aria-hidden="true"
+            >play_arrow</span
+          >
+          <span id="play-button-label">Play</span>
+        </button>
+        <button id="next-button" type="button" class="button-includes-icon">
+          <span class="material-symbols-outlined" aria-hidden="true"
+            >skip_next</span
+          >
+          <span>Next</span>
+        </button>
+      </div>
       <div id="volume-control">
         <label for="volume-input">Volume</label>
         <input

@@ -11,41 +11,51 @@ const NOISE_TITLES: Record<NoiseType, string> = {
   brown: "Brown Noise",
 }
 
+const setHandler = (
+  action: MediaSessionAction,
+  handler: MediaSessionActionHandler,
+) => {
+  if (!("mediaSession" in navigator)) return
+  try {
+    navigator.mediaSession.setActionHandler(action, handler)
+  } catch {}
+}
+
 /**
  * OS / ロック画面 / イヤホンボタンからの操作を受け取るハンドラを設定します。
  */
 export function setupMediaSessionHandlers(callbacks: {
   onPlay: () => void
   onPause: () => void
-  // onNext: () => void
-  // onPrevious: () => void
+  onNext: () => void
+  onPrevious: () => void
 }) {
   if (!("mediaSession" in navigator)) return
 
   // ロック画面やイヤホンで Play が押された時
-  navigator.mediaSession.setActionHandler("play", () => {
+  setHandler("play", () => {
     callbacks.onPlay()
   })
 
   // ロック画面やイヤホンで Pause が押された時
-  navigator.mediaSession.setActionHandler("pause", () => {
+  setHandler("pause", () => {
     callbacks.onPause()
   })
 
   // Stop アクションも Pause と同様に扱う
-  navigator.mediaSession.setActionHandler("stop", () => {
+  setHandler("stop", () => {
     callbacks.onPause()
   })
 
-  // // ロック画面やイヤホンで Next が押された時
-  // navigator.mediaSession.setActionHandler("nexttrack", () => {
-  //   callbacks.onNext()
-  // })
+  // ロック画面やイヤホンで Next が押された時
+  setHandler("nexttrack", () => {
+    callbacks.onNext()
+  })
 
-  // // ロック画面やイヤホンで Previous が押された時
-  // navigator.mediaSession.setActionHandler("previoustrack", () => {
-  //   callbacks.onPrevious()
-  // })
+  // ロック画面やイヤホンで Previous が押された時
+  setHandler("previoustrack", () => {
+    callbacks.onPrevious()
+  })
 }
 
 /**
