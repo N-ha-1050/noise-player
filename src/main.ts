@@ -22,14 +22,14 @@ type State =
       context: null
       gainNode: null
       noiseNode: null
-      silentAudio: null
+      anchorAudio: null
     }
   | {
       isPlaying: boolean
       context: AudioContext
       gainNode: GainNode
       noiseNode: AudioWorkletNode
-      silentAudio: HTMLAudioElement | null
+      anchorAudio: HTMLAudioElement
     }
 
 function render(state: State) {
@@ -64,16 +64,21 @@ async function startPlayback(state: State) {
     context: stateContext,
     gainNode: stateGainNode,
     noiseNode: stateNoiseNode,
-    silentAudio: stateSilentAudio,
+    anchorAudio: stateAnchorAudio,
   } = state
 
-  const { context, gainNode, noiseNode } = await ensureAudioInitialized(
-    stateContext,
-    stateGainNode,
-    stateNoiseNode,
-  )
+  const { context, gainNode, noiseNode, anchorAudio } =
+    await ensureAudioInitialized(
+      stateContext,
+      stateGainNode,
+      stateNoiseNode,
+      stateAnchorAudio,
+    )
 
   if (context.state === "suspended") await context.resume()
+  await anchorAudio.play().catch(() => {
+    // 自動再生ポリシー違反時のフォールバック
+  })
 
   // 再生: 現在選択中のノイズを設定し、スライダーの音量へフェードイン
   const noiseType = getCurrentNoiseType()
@@ -82,9 +87,15 @@ async function startPlayback(state: State) {
   const targetVolume = parseFloat(volumeInput.value)
   gainNode.gain.setTargetAtTime(targetVolume, context.currentTime, 0.05)
 
-  const silentAudio = updateMediaSession(true, noiseType, stateSilentAudio)
+  updateMediaSession(true, noiseType)
 
-  state = { isPlaying: true, context, gainNode, noiseNode, silentAudio }
+  state = {
+    isPlaying: true,
+    context,
+    gainNode,
+    noiseNode,
+    anchorAudio,
+  }
   render(state)
   return state
 }
@@ -92,22 +103,28 @@ async function startPlayback(state: State) {
 function stopPlayback(state: State) {
   if (!state.isPlaying) return state
 
-  const { context, gainNode, noiseNode } = state
+  const { context, gainNode, noiseNode, anchorAudio } = state
 
   // 停止: ポップノイズ防止のため 0.05秒かけて音量を 0 にフェードアウト
-  gainNode.gain.setTargetAtTime(0, context.currentTime, 0.05)
+  gainNode.gain.setTargetAtTime(0.001, context.currentTime, 0.05) // メディアコントロールを表示し続けるために 0.001 と設定
 
   // フェードアウト完了後（約60ms後）に AudioContext を完全休止
-  setTimeout(async () => {
-    if (!state.isPlaying && context.state === "running") {
-      await context.suspend()
-    }
-  }, 60)
+  // setTimeout(async () => {
+  //   if (!state.isPlaying && context.state === "running") {
+  //     await context.suspend()
+  //   }
+  // }, 60)
 
   const noiseType = getCurrentNoiseType()
-  const silentAudio = updateMediaSession(false, noiseType, state.silentAudio)
+  updateMediaSession(false, noiseType)
 
-  state = { isPlaying: false, context, gainNode, noiseNode, silentAudio }
+  state = {
+    isPlaying: false,
+    context,
+    gainNode,
+    noiseNode,
+    anchorAudio,
+  }
   render(state)
   return state
 }
@@ -118,17 +135,15 @@ function changeNoiseType(state: State, noiseType: NoiseType) {
   ) as HTMLSelectElement
   noiseSelect.value = noiseType
 
-  const { noiseNode, isPlaying, silentAudio } = state
+  const { noiseNode, isPlaying } = state
 
   if (noiseNode) {
     // 再生中でも停止中でも、Worklet にメッセージを送るだけで即座に切り替わる
     setNoiseType(noiseType, noiseNode)
   }
 
-  if (isPlaying) {
-    // 再生中であれば、ロック画面等のタイトル表示も即座に更新
-    updateMediaSession(true, noiseType, silentAudio)
-  }
+  // 再生中であれば、ロック画面等のタイトル表示も即座に更新
+  updateMediaSession(isPlaying, noiseType)
 
   return state
 }
@@ -170,7 +185,7 @@ async function main() {
     context: null,
     gainNode: null,
     noiseNode: null,
-    silentAudio: null,
+    anchorAudio: null,
   }
 
   // 再生 / 停止ボタン
