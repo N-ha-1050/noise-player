@@ -32,6 +32,8 @@ type State =
       anchorAudio: HTMLAudioElement
     }
 
+let playbackGeneration = 0
+
 function render(state: State) {
   const playButton = document.getElementById("play-button") as HTMLButtonElement
   const playButtonIcon = document.getElementById(
@@ -57,6 +59,8 @@ function getCurrentNoiseType() {
 }
 
 async function startPlayback(state: State) {
+  const startGeneration = ++playbackGeneration
+
   const volumeInput = document.getElementById(
     "volume-input",
   ) as HTMLInputElement
@@ -75,10 +79,16 @@ async function startPlayback(state: State) {
       stateAnchorAudio,
     )
 
+  if (startGeneration !== playbackGeneration) return state
+
   if (context.state === "suspended") await context.resume()
+  if (startGeneration !== playbackGeneration) return state
+
   await anchorAudio.play().catch(() => {
     // 自動再生ポリシー違反時のフォールバック
   })
+
+  if (startGeneration !== playbackGeneration) return state
 
   // 再生: 現在選択中のノイズを設定し、スライダーの音量へフェードイン
   const noiseType = getCurrentNoiseType()
@@ -101,19 +111,21 @@ async function startPlayback(state: State) {
 }
 
 function stopPlayback(state: State) {
-  if (!state.isPlaying) return state
+  const { context, gainNode, noiseNode, anchorAudio, isPlaying } = state
+  playbackGeneration += 1
+  if (!isPlaying) return state
 
-  const { context, gainNode, noiseNode, anchorAudio } = state
+  const stopGeneration = playbackGeneration
 
   // 停止: ポップノイズ防止のため 0.05秒かけて音量を 0 にフェードアウト
-  gainNode.gain.setTargetAtTime(0.001, context.currentTime, 0.05) // メディアコントロールを表示し続けるために 0.001 と設定
+  gainNode.gain.setTargetAtTime(0, context.currentTime, 0.05)
 
   // フェードアウト完了後（約60ms後）に AudioContext を完全休止
-  // setTimeout(async () => {
-  //   if (!state.isPlaying && context.state === "running") {
-  //     await context.suspend()
-  //   }
-  // }, 60)
+  setTimeout(async () => {
+    if (stopGeneration === playbackGeneration && context.state === "running") {
+      await context.suspend()
+    }
+  }, 60)
 
   const noiseType = getCurrentNoiseType()
   updateMediaSession(false, noiseType)
