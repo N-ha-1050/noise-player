@@ -1,58 +1,142 @@
+import {
+  disableSeekBar,
+  setMediaMetadata,
+  setMediaPlaybackState,
+} from "./../media/mediaSession"
+import { createSilentAudioUrl } from "./../utils"
 import noiseProcessorUrl from "./noiseWorker?worker&url"
 
-export async function ensureAudioInitialized(
-  context: AudioContext | null,
-  gainNode: GainNode | null,
-  noiseNode: AudioWorkletNode | null,
-  anchorAudio: HTMLAudioElement | null,
+export type State =
+  | {
+      isPlaying: false
+      audioContext: null
+      gainNode: null
+      workletNode: null
+      audioElement: null
+    }
+  | {
+      isPlaying: boolean
+      audioContext: AudioContext
+      gainNode: GainNode
+      workletNode: AudioWorkletNode
+      audioElement: HTMLAudioElement
+    }
+
+async function initAudioContext(
+  state: State,
+  volume: number,
+  noiseType: string,
+  noiseTypeTitle: string,
 ) {
-  if (context && gainNode && noiseNode && anchorAudio) {
-    return { context, gainNode, noiseNode, anchorAudio }
-  }
+  if (state.audioContext) return state
 
-  const newContext = new AudioContext()
-  const newGainNode = initializeGainNode(newContext)
-  const newNoiseNode = await initializeNoiseNode(newContext)
+  const newAudioContext = new AudioContext()
+  await newAudioContext.audioWorklet.addModule(noiseProcessorUrl)
 
-  newNoiseNode.connect(newGainNode).connect(newContext.destination)
+  const newGainNode = newAudioContext.createGain()
+  const newWorkletNode = new AudioWorkletNode(
+    newAudioContext,
+    "noise-processor",
+  )
 
-  const dest = initializeMediaAnchorNode(newContext)
-  newGainNode.connect(dest)
+  newWorkletNode.connect(newGainNode).connect(newAudioContext.destination)
 
-  const newAnchorAudio = new Audio()
-  newAnchorAudio.srcObject = dest.stream
-  newAnchorAudio.volume = 0
+  const newAudioElement = new Audio(createSilentAudioUrl(10))
+  newAudioElement.loop = true
+
+  setVolume(
+    {
+      isPlaying: state.isPlaying,
+      audioContext: newAudioContext,
+      gainNode: newGainNode,
+      workletNode: newWorkletNode,
+      audioElement: newAudioElement,
+    },
+    volume,
+  )
+  setNoiseType(
+    {
+      isPlaying: state.isPlaying,
+      audioContext: newAudioContext,
+      gainNode: newGainNode,
+      workletNode: newWorkletNode,
+      audioElement: newAudioElement,
+    },
+    noiseType,
+    noiseTypeTitle,
+  )
+  disableSeekBar()
 
   return {
-    context: newContext,
+    isPlaying: state.isPlaying,
+    audioContext: newAudioContext,
     gainNode: newGainNode,
-    noiseNode: newNoiseNode,
-    anchorAudio: newAnchorAudio,
+    workletNode: newWorkletNode,
+    audioElement: newAudioElement,
   }
 }
 
-async function initializeNoiseNode(context: AudioContext) {
-  await context.audioWorklet.addModule(noiseProcessorUrl)
+export async function startPlayback(
+  state: State,
+  volume: number,
+  noiseType: string,
+  noiseTypeTitle: string,
+) {
+  const { audioContext, audioElement, ...restState } = await initAudioContext(
+    state,
+    volume,
+    noiseType,
+    noiseTypeTitle,
+  )
 
-  const noiseNode = new AudioWorkletNode(context, "noise-processor", {
-    outputChannelCount: [2], // ステレオ出力
+  if (audioContext.state === "suspended") {
+    await audioContext.resume()
+  }
+  await audioElement.play().catch(() => {
+    console.debug(
+      "Silent media element play was rejected; continuing audio output.",
+    )
   })
+  setMediaPlaybackState("playing")
 
-  return noiseNode
+  disableSeekBar()
+
+  return { ...restState, isPlaying: true, audioContext, audioElement }
 }
 
-function initializeGainNode(context: AudioContext) {
-  const gainNode = context.createGain()
-  gainNode.gain.setValueAtTime(0, context.currentTime) // 初期音量は 0（ミュート）にしておき、再生時にフェードインさせる
+export function stopPlayback(state: State) {
+  const { audioContext, audioElement } = state
 
-  return gainNode
+  if (!audioContext) return state
+
+  audioElement.pause()
+  audioContext.suspend()
+  setMediaPlaybackState("paused")
+
+  return { ...state, isPlaying: false }
 }
 
-function initializeMediaAnchorNode(context: AudioContext) {
-  const dest = context.createMediaStreamDestination()
-  return dest
+export function setVolume(state: State, volume: number) {
+  const { audioContext, gainNode } = state
+
+  if (!audioContext) return
+
+  gainNode.gain.setTargetAtTime(volume, audioContext.currentTime, 0.05)
 }
 
-export function setNoiseType(type: string, noiseNode: AudioWorkletNode) {
-  noiseNode.port.postMessage({ type: "SET_NOISE", noiseType: type })
+export function setNoiseType(
+  state: State,
+  noiseType: string,
+  noiseTypeTitle: string,
+) {
+  const { workletNode } = state
+
+  if (!workletNode) return
+
+  workletNode.port.postMessage({
+    type: "SET_TYPE",
+    noiseType,
+  })
+  setMediaMetadata(noiseTypeTitle)
+  disableSeekBar()
 }

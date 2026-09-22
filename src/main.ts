@@ -5,256 +5,138 @@ import "@fontsource-variable/material-symbols-outlined/wght.css"
 
 import "./style.css"
 
-import { ensureAudioInitialized, setNoiseType } from "./audio/audioEngine"
 import {
-  type NoiseType,
-  noiseTypes,
-  validNoiseType,
-} from "./audio/noiseCreators"
+  type State,
+  setNoiseType,
+  setVolume,
+  startPlayback,
+  stopPlayback,
+} from "./audio/audioEngine"
 import {
-  setupMediaSessionHandlers,
-  updateMediaSession,
+  type MediaSessionActionHandlers,
+  setupMediaSession,
 } from "./media/mediaSession"
+import { getTypedElementById } from "./utils"
 
-type State =
-  | {
-      isPlaying: false
-      context: null
-      gainNode: null
-      noiseNode: null
-      anchorAudio: null
-    }
-  | {
-      isPlaying: boolean
-      context: AudioContext
-      gainNode: GainNode
-      noiseNode: AudioWorkletNode
-      anchorAudio: HTMLAudioElement
-    }
+function main() {
+  const playButton = getTypedElementById("button", "play-button")
+  const playButtonIcon = getTypedElementById("span", "play-button-icon")
+  const playButtonLabel = getTypedElementById("span", "play-button-label")
+  const volumeInput = getTypedElementById("input", "volume-input")
+  const noiseSelect = getTypedElementById("select", "noise-select")
+  const previousButton = getTypedElementById("button", "previous-button")
+  const nextButton = getTypedElementById("button", "next-button")
+  if (
+    !playButton ||
+    !playButtonIcon ||
+    !playButtonLabel ||
+    !volumeInput ||
+    !noiseSelect ||
+    !previousButton ||
+    !nextButton
+  )
+    return
 
-let playbackGeneration = 0
-
-function render(state: State) {
-  const playButton = document.getElementById("play-button") as HTMLButtonElement
-  const playButtonIcon = document.getElementById(
-    "play-button-icon",
-  ) as HTMLSpanElement
-  const playButtonLabel = document.getElementById(
-    "play-button-label",
-  ) as HTMLSpanElement
-
-  playButton.setAttribute("aria-pressed", state.isPlaying.toString())
-  playButtonIcon.textContent = state.isPlaying ? "pause" : "play_arrow"
-  playButtonLabel.textContent = state.isPlaying ? "Pause" : "Play"
-}
-
-function getCurrentNoiseType() {
-  const noiseSelect = document.getElementById(
-    "noise-select",
-  ) as HTMLSelectElement
-  const noiseType = validNoiseType(noiseSelect.value)
-    ? noiseSelect.value
-    : "white"
-  return noiseType
-}
-
-async function startPlayback(state: State) {
-  const startGeneration = ++playbackGeneration
-
-  const volumeInput = document.getElementById(
-    "volume-input",
-  ) as HTMLInputElement
-  const {
-    context: stateContext,
-    gainNode: stateGainNode,
-    noiseNode: stateNoiseNode,
-    anchorAudio: stateAnchorAudio,
-  } = state
-
-  const { context, gainNode, noiseNode, anchorAudio } =
-    await ensureAudioInitialized(
-      stateContext,
-      stateGainNode,
-      stateNoiseNode,
-      stateAnchorAudio,
-    )
-
-  if (startGeneration !== playbackGeneration) return state
-
-  if (context.state === "suspended") await context.resume()
-  if (startGeneration !== playbackGeneration) return state
-
-  await anchorAudio.play().catch(() => {
-    // 自動再生ポリシー違反時のフォールバック
-  })
-
-  if (startGeneration !== playbackGeneration) return state
-
-  // 再生: 現在選択中のノイズを設定し、スライダーの音量へフェードイン
-  const noiseType = getCurrentNoiseType()
-  setNoiseType(noiseType, noiseNode)
-
-  const targetVolume = parseFloat(volumeInput.value)
-  gainNode.gain.setTargetAtTime(targetVolume, context.currentTime, 0.05)
-
-  updateMediaSession(true, noiseType)
-
-  state = {
-    isPlaying: true,
-    context,
-    gainNode,
-    noiseNode,
-    anchorAudio,
-  }
-  render(state)
-  return state
-}
-
-function stopPlayback(state: State) {
-  const { context, gainNode, noiseNode, anchorAudio, isPlaying } = state
-  playbackGeneration += 1
-  if (!isPlaying) return state
-
-  const stopGeneration = playbackGeneration
-
-  // 停止: ポップノイズ防止のため 0.05秒かけて音量を 0 にフェードアウト
-  gainNode.gain.setTargetAtTime(0, context.currentTime, 0.05)
-
-  // フェードアウト完了後（約60ms後）に AudioContext を完全休止
-  setTimeout(async () => {
-    if (stopGeneration === playbackGeneration && context.state === "running") {
-      await context.suspend()
-    }
-  }, 60)
-
-  const noiseType = getCurrentNoiseType()
-  updateMediaSession(false, noiseType)
-
-  state = {
+  const state: State = {
     isPlaying: false,
-    context,
-    gainNode,
-    noiseNode,
-    anchorAudio,
-  }
-  render(state)
-  return state
-}
-
-function changeNoiseType(state: State, noiseType: NoiseType) {
-  const noiseSelect = document.getElementById(
-    "noise-select",
-  ) as HTMLSelectElement
-  noiseSelect.value = noiseType
-
-  const { noiseNode, isPlaying } = state
-
-  if (noiseNode) {
-    // 再生中でも停止中でも、Worklet にメッセージを送るだけで即座に切り替わる
-    setNoiseType(noiseType, noiseNode)
-  }
-
-  // 再生中であれば、ロック画面等のタイトル表示も即座に更新
-  updateMediaSession(isPlaying, noiseType)
-
-  return state
-}
-
-function getPreviousNoiseType(current: NoiseType) {
-  const currentIndex = noiseTypes.indexOf(current)
-  const previousIndex =
-    (currentIndex - 1 + noiseTypes.length) % noiseTypes.length
-  return noiseTypes[previousIndex]
-}
-
-function getNextNoiseType(current: NoiseType) {
-  const currentIndex = noiseTypes.indexOf(current)
-  const nextIndex = (currentIndex + 1) % noiseTypes.length
-  return noiseTypes[nextIndex]
-}
-
-const changeNoiseTypeToPrevious = (state: State, currentNoiseType: NoiseType) =>
-  changeNoiseType(state, getPreviousNoiseType(currentNoiseType))
-
-const changeNoiseTypeToNext = (state: State, currentNoiseType: NoiseType) =>
-  changeNoiseType(state, getNextNoiseType(currentNoiseType))
-
-async function main() {
-  const playButton = document.getElementById("play-button") as HTMLButtonElement
-  const volumeInput = document.getElementById(
-    "volume-input",
-  ) as HTMLInputElement
-  const noiseSelect = document.getElementById(
-    "noise-select",
-  ) as HTMLSelectElement
-  const previousButton = document.getElementById(
-    "previous-button",
-  ) as HTMLButtonElement
-  const nextButton = document.getElementById("next-button") as HTMLButtonElement
-
-  let state: State = {
-    isPlaying: false,
-    context: null,
+    audioContext: null,
     gainNode: null,
-    noiseNode: null,
-    anchorAudio: null,
+    workletNode: null,
+    audioElement: null,
   }
 
-  // 再生 / 停止ボタン
-  playButton.addEventListener("click", async () => {
-    if (state.isPlaying) {
-      state = stopPlayback(state)
-    } else {
-      state = await startPlayback(state)
-    }
-  })
+  const render = (state: State) => {
+    playButton.setAttribute("aria-pressed", state.isPlaying.toString())
+    playButtonIcon.textContent = state.isPlaying ? "pause" : "play_arrow"
+    playButtonLabel.textContent = state.isPlaying ? "Pause" : "Play"
+  }
 
-  setupMediaSessionHandlers({
-    onPlay: async () => {
-      state = await startPlayback(state)
-    },
-    onPause: () => {
-      state = stopPlayback(state)
-    },
-    onNext: () => {
-      const currentNoiseType = getCurrentNoiseType()
-      state = changeNoiseTypeToNext(state, currentNoiseType)
-    },
-    onPrevious: () => {
-      const currentNoiseType = getCurrentNoiseType()
-      state = changeNoiseTypeToPrevious(state, currentNoiseType)
-    },
-  })
+  const optionsLength = noiseSelect.options.length
+  const getPreviousNoiseOption = () =>
+    noiseSelect.options[
+      (noiseSelect.selectedIndex - 1 + optionsLength) % optionsLength
+    ]
+  const getNextNoiseOption = () =>
+    noiseSelect.options[(noiseSelect.selectedIndex + 1) % optionsLength]
 
-  // 前のノイズボタン
+  playButton.addEventListener("click", async () =>
+    render(
+      state.isPlaying
+        ? Object.assign(state, stopPlayback(state))
+        : Object.assign(
+            state,
+            await startPlayback(
+              state,
+              parseFloat(volumeInput.value),
+              noiseSelect.value,
+              noiseSelect.options[noiseSelect.selectedIndex].text,
+            ),
+          ),
+    ),
+  )
+  volumeInput.addEventListener("input", () =>
+    setVolume(state, parseFloat(volumeInput.value)),
+  )
+  noiseSelect.addEventListener("change", () =>
+    setNoiseType(
+      state,
+      noiseSelect.value,
+      noiseSelect.options[noiseSelect.selectedIndex].text,
+    ),
+  )
   previousButton.addEventListener("click", () => {
-    const currentNoiseType = getCurrentNoiseType()
-    state = changeNoiseTypeToPrevious(state, currentNoiseType)
+    const previousOption = getPreviousNoiseOption()
+    noiseSelect.value = previousOption.value
+    setNoiseType(state, previousOption.value, previousOption.text)
   })
-
-  // 次のノイズボタン
   nextButton.addEventListener("click", () => {
-    const currentNoiseType = getCurrentNoiseType()
-    state = changeNoiseTypeToNext(state, currentNoiseType)
+    const nextOption = getNextNoiseOption()
+    noiseSelect.value = nextOption.value
+    setNoiseType(state, nextOption.value, nextOption.text)
   })
 
-  // 音量スライダー
-  volumeInput.addEventListener("input", () => {
-    const { context, gainNode, isPlaying } = state
+  const actionHandlers: MediaSessionActionHandlers = [
+    [
+      "play",
+      async () =>
+        render(
+          Object.assign(
+            state,
+            await startPlayback(
+              state,
+              parseFloat(volumeInput.value),
+              noiseSelect.value,
+              noiseSelect.options[noiseSelect.selectedIndex].text,
+            ),
+          ),
+        ),
+    ],
+    ["pause", () => render(Object.assign(state, stopPlayback(state)))],
+    ["stop", () => render(Object.assign(state, stopPlayback(state)))],
+    [
+      "previoustrack",
+      () => {
+        const previousOption = getPreviousNoiseOption()
+        noiseSelect.value = previousOption.value
+        setNoiseType(state, previousOption.value, previousOption.text)
+      },
+    ],
+    [
+      "nexttrack",
+      () => {
+        const nextOption = getNextNoiseOption()
+        noiseSelect.value = nextOption.value
+        setNoiseType(state, nextOption.value, nextOption.text)
+      },
+    ],
 
-    if (!gainNode || !context || !isPlaying) return
-    const targetVolume = parseFloat(volumeInput.value)
-    // スライダー操作時も滑らかに追従
-    gainNode.gain.setTargetAtTime(targetVolume, context.currentTime, 0.01)
-  })
+    // シーク操作（10秒戻る/進む・シークバー操作）は無効化
+    ["seekto", null],
+    ["seekbackward", null],
+    ["seekforward", null],
+  ]
 
-  // ノイズ種類セレクトボックス
-  noiseSelect.addEventListener("change", () => {
-    const noiseType = getCurrentNoiseType()
-    state = changeNoiseType(state, noiseType)
-  })
-
-  render(state)
+  setupMediaSession(actionHandlers)
 }
 
 main()
