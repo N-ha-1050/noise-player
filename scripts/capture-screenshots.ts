@@ -3,6 +3,38 @@ import path from "node:path"
 import { chromium } from "playwright"
 import { preview } from "vite"
 
+const SCREENSHOT_TARGETS: {
+  name: string
+  viewport: { width: number; height: number }
+  colorScheme: "light" | "dark"
+  isMobile: boolean
+}[] = [
+  {
+    name: "desktop-light.png",
+    viewport: { width: 1280, height: 720 },
+    colorScheme: "light",
+    isMobile: false,
+  },
+  {
+    name: "desktop-dark.png",
+    viewport: { width: 1280, height: 720 },
+    colorScheme: "dark",
+    isMobile: false,
+  },
+  {
+    name: "mobile-light.png",
+    viewport: { width: 390, height: 844 },
+    colorScheme: "light",
+    isMobile: true,
+  },
+  {
+    name: "mobile-dark.png",
+    viewport: { width: 390, height: 844 },
+    colorScheme: "dark",
+    isMobile: true,
+  },
+]
+
 async function main() {
   const outDir = path.resolve("public/screenshots")
   if (!fs.existsSync(outDir)) {
@@ -14,29 +46,25 @@ async function main() {
   const browser = await chromium.launch()
 
   try {
-    // デスクトップ用画面の撮影
-    const desktopContext = await browser.newContext({
-      viewport: { width: 1280, height: 720 },
-    })
-    const desktopPage = await desktopContext.newPage()
-    await desktopPage.goto("http://localhost:4173")
-    await desktopPage.waitForLoadState("networkidle")
-    await desktopPage.screenshot({ path: path.join(outDir, "desktop.png") })
-    await desktopContext.close()
+    for (const target of SCREENSHOT_TARGETS) {
+      const context = await browser.newContext({
+        viewport: target.viewport,
+        colorScheme: target.colorScheme,
+        userAgent: target.isMobile
+          ? "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
+          : undefined,
+      })
 
-    // モバイル用画面の撮影
-    const mobileContext = await browser.newContext({
-      viewport: { width: 390, height: 844 },
-      userAgent:
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1",
-    })
-    const mobilePage = await mobileContext.newPage()
-    await mobilePage.goto("http://localhost:4173")
-    await mobilePage.waitForLoadState("networkidle")
-    await mobilePage.screenshot({ path: path.join(outDir, "mobile.png") })
-    await mobileContext.close()
+      const page = await context.newPage()
+      await page.goto("http://localhost:4173")
+      await page.waitForLoadState("networkidle")
 
-    console.log("Screenshots generated in public/screenshots/")
+      const outputPath = path.join(outDir, target.name)
+      await page.screenshot({ path: outputPath })
+      console.log(`Saved screenshot: ${target.name}`)
+
+      await context.close()
+    }
   } finally {
     await browser.close()
     await server.close()
